@@ -1,0 +1,10 @@
+.DS_Store
+__pycache__/
+*.pyc
+*.o
+*.out
+*.exe
+*.log
+venv/
+.env
+binaries.tgz

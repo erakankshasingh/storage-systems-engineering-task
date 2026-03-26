@@ -1,0 +1,155 @@
+Task 3 — Reverse Engineering Notes (macOS-based analysis)
+
+Environment
+-----------
+The archive was inspected on macOS first. The two extracted files were named:
+
+- a
+- b
+
+Initial issue encountered on macOS
+----------------------------------
+Trying to execute the files directly on macOS produced:
+
+    zsh: exec format error: ./a
+
+and similarly for b.
+
+This indicates that the files are not native macOS executables. To verify that, I used:
+
+    file a
+    file b
+
+Expected / observed result:
+- both files are ELF 64-bit x86-64 Linux executables, not Mach-O macOS binaries
+
+This explains the macOS execution failure:
+- the shell error on macOS is a platform / executable-format mismatch
+- it is not yet the internal bug of the program itself
+
+GDB on macOS
+------------
+I also encountered:
+
+    zsh: command not found: gdb
+
+So, on macOS, I could not use GDB immediately. In addition, even with gdb installed, these Linux ELF binaries would still not run natively on macOS.
+
+Therefore, on macOS I switched to static analysis:
+- file
+- strings -a
+
+Why `strings -a` was necessary
+------------------------------
+A plain `strings` run mostly showed generic libc / runtime / loader text, which was noisy and not very useful for identifying the actual program logic.
+
+Using:
+
+    strings -a a
+    strings -a b
+
+was more useful because `-a` scans the whole file and exposes application-specific strings more reliably.
+
+Binary a
+--------
+Commands used:
+
+    file a
+    strings -a a | less
+    strings -a a | grep -n '^\./'
+    strings -a a | grep -n 'pesho'
+
+Important line found:
+
+    3786:./pesho
+
+------------------
+;/t{H
+./pesho
+../csu/libc-start.c
+/dev/full
+/dev/null
+%s/%s
+--------------------
+
+
+Interpretation:
+- `./pesho` is a relative path in the current working directory
+- unlike paths such as `/dev/null` or `/usr/share/locale`, it looks application-specific
+- this strongly suggests that binary `a` expects a local file named `pesho`
+
+What can be concluded from macOS static analysis alone:
+- binary `a` appears to depend on a local file `./pesho`
+- a likely crash scenario is that file handling around this path is broken
+- a missing or unreadable `./pesho` is therefore a plausible trigger
+
+- this strongly suggests that the program is trying to open a local file with that name
+- therefore the internal failure is most likely related to broken file-handling logic around `./pesho`
+
+Binary b
+--------
+Commands used:
+
+    file b
+    strings -a b | less
+    strings -a b | grep -n 'TMPDIR\|Init done %d \.\|Enter password: \|WRONG\|OK\.'
+
+Important lines found:
+
+    3943:TMPDIR
+    3944:Init done %d .
+    3945:Enter password: 
+    3946:WRONG
+
+------------------------
+TMPDIR
+Init done %d .
+Enter password: 
+WRONG
+aligned_OK (chunk2mem (p))
+TMPDIR
+status == __GCONV_OK || status == __GCONV_EMPTY_INPUT || status == __GCONV_ILLEGAL_INPUT || status == __GCONV_INCOMPLETE_INPUT || status == __GCONV_FULL_OUTPUT
+version == NULL || (flags & ~(DL_LOOKUP_ADD_DEPENDENCY | DL_LOOKUP_GSCOPE_LOCK)) == 0
+--------------------------
+
+Interpretation:
+- `TMPDIR` suggests that the program reads the TMPDIR environment variable during initialization
+- `Enter password:` shows that the binary prompts the user for a password
+- `WRONG` shows that there is an explicit password-check path
+- together, these strings strongly suggest:
+  1. an initialization step involving TMPDIR
+  2. a password prompt
+  3. a password validation result path
+
+What can be concluded from macOS static analysis alone:
+- binary `b` appears to use the `TMPDIR` environment variable
+- binary `b` also appears to prompt for a password and validate it
+- the crash likely happens early enough that initialization or environment handling is involved
+
+
+- macOS could not execute the file because it is a Linux ELF binary
+- static inspection with `strings -a` revealed `TMPDIR`, `Enter password:`, and `WRONG`
+- this strongly suggests that the binary performs an initialization step involving the TMPDIR environment variable and then runs a password check
+- therefore the internal crash is likely related to early initialization / environment handling before or around the password-check path
+
+Summary
+-------
+
+What these errors mean:
+- the files are Linux ELF executables and cannot run natively on macOS
+- therefore macOS only allowed static inspection, not direct runtime debugging
+
+Commands that produced the most useful evidence:
+- `file a`
+- `file b`
+- `strings -a a | grep -n '^\./'`
+- `strings -a a | grep -n 'pesho'`
+- `strings -a b | grep -n 'TMPDIR\|Init done %d \.\|Enter password: \|WRONG\|OK\.'`
+
+Most useful evidence lines:
+- for a: `./pesho`
+- for b: `TMPDIR`, `Enter password:`, `WRONG`
+
+Final note
+----------
+This macOS-based analysis is enough to identify likely intent and likely failure areas, but not enough to prove the exact crash instruction. Exact root-cause confirmation would require running the binaries in a Linux x86-64 environment (for example Docker, a VM, or a remote Linux machine) and then using tools such as gdb, strace, or objdump.
