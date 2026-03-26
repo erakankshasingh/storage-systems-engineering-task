@@ -75,7 +75,6 @@ A plain `strings` run mostly returned generic runtime / libc / loader text, whic
 
 Using `strings -a` was more useful because it scans the full binary and exposes application-specific strings more reliably.
 
----
 
 ## Analysis of binary `a`
 
@@ -110,15 +109,6 @@ From macOS static analysis alone, the safest conclusion is:
 - the crash is likely related to broken file-handling logic around that file
 - a missing or unreadable `./pesho` is therefore a plausible trigger
 
-### What I would not overclaim
-
-Without Linux execution, debugger access, or assembly-level confirmation, I would not claim on macOS alone:
-
-- the exact crashing instruction
-- the exact memory corruption path
-- the exact internal root cause beyond file-handling being central
-
----
 
 ## Analysis of binary `b`
 
@@ -158,15 +148,6 @@ From macOS static analysis alone, the safest conclusion is:
 - binary `b` then appears to prompt the user for a password
 - the crash likely happens early, during initialization or environment handling, before or around the password-check path
 
-### What I would not overclaim
-
-Without Linux runtime debugging or disassembly-level proof, I would not claim on macOS alone:
-
-- the exact crashing instruction
-- whether the crash is specifically caused by dereferencing a null pointer
-- the exact password-check implementation
-
----
 
 ## Summary
 
@@ -195,7 +176,6 @@ strings -a b | grep -n 'TMPDIR\|Init done %d \.\|Enter password: \|WRONG\|OK\.'
 - for `a`: `./pesho`
 - for `b`: `TMPDIR`, `Enter password:`, `WRONG`, `OK.`
 
----
 
 ## Final note
 

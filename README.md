@@ -26,18 +26,18 @@ The program:
 
 The solution avoids loading the full decompressed JSON into memory.
 
-### Task 3 — Reverse engineering notes
-Analyzed two provided Linux ELF executables that crash in different ways.
+### Task 3 — Reverse Engineering (macOS-based Static Analysis)
 
-Because the initial inspection environment was macOS, the analysis focused first on:
-- platform-related execution errors on macOS
-- static inspection using tools such as `file` and `strings -a`
-- identifying likely intent and likely failure areas conservatively
+#### Overview
 
-The notes separate:
-- direct observations
-- reasonable inferences
-- what would require Linux runtime debugging for exact confirmation
+The archive contains two executable files, `a` and `b`.  
+The goal is to explain why they crash and what they appear to be trying to do.
+
+Because the binaries are Linux ELF executables and the initial analysis environment was macOS, this document focuses on static inspection rather than runtime debugging. It records:
+- the errors encountered on macOS
+- the commands used for inspection
+- the most relevant evidence extracted from the binaries
+- conservative conclusions supported by that evidence
 
 ## Repository structure
 
